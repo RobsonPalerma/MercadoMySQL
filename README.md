@@ -1,92 +1,101 @@
-📦 Mercado Fácil — PDV + Servidor Node.js 🔄 Arquitetura Offline-First com Sincronização JSON
+📦 Explicação do Banco MySQL Sistema de Estoque – Mercado Fácil 🗄️ Banco de Dados: mercado_facil CREATE DATABASE mercado_facil;
 
-👥 1. Integrante do Projeto David Roberto da Silva Sousa — Matrícula 01765638
+👉 É o container principal onde ficam todas as tabelas do sistema.
 
-🛠️ 2. Como Executar o Servidor (mercadofacil-server - Node.js) O servidor funciona como uma API REST, responsável por produtos, vendas e sincronização entre PDV ↔ servidor. 📌 Pré-requisitos
+🧱 1️⃣ Tabela produto 🎯 Finalidade
 
-Node.js (versão 18 ou superior)
+Guarda as informações principais de cada produto em estoque.
 
-NPM (já vem com o Node)
+📄 Estrutura produto ( id, codigo, quantidade, estoque_minimo, estoque_maximo, status, data_cadastro, data_atualizacao )
 
-Visual Studio Code
+🔍 Campo por campo Campo Explicação HTML relacionado id Identificador único do produto Interno codigo Código do produto (ex: PROD001) Código do Produto quantidade Quantidade atual em estoque Dashboard / Movimentação estoque_minimo Limite mínimo permitido Estoque Mínimo estoque_maximo Limite máximo permitido Estoque Máximo status Situação do estoque (OK, BAIXO, FORA) Dashboard data_cadastro Data do cadastro do produto — data_atualizacao Última atualização automática Relatório 📌 Por que existe o campo status?
 
-▶️ Passo a Passo para Rodar o Servidor no VSCode 1️⃣ Abra o projeto no VSCode mercadofacil-server/ ├── package.json ├── server.js ├── src/ └── ...
+Para não calcular toda hora no sistema, o banco já informa:
 
-2️⃣ Instale as dependências No terminal integrado (CTRL + `): npm install
+OK → estoque normal
 
-3️⃣ Inicie o servidor npm start
+BAIXO → abaixo do mínimo
 
-Ou, se quiser rodar em modo desenvolvedor: npm run dev
+FORA → zerado
 
-4️⃣ Acesse no navegador http://localhost:3000
+Isso deixa o sistema mais rápido e organizado.
 
-📌 Estrutura mínima do servidor (Node.js + Express) Exemplo simples do arquivo server.js: const express = require("express"); const cors = require("cors"); const fs = require("fs"); const app = express();
+🔄 2️⃣ Tabela movimentacao_estoque 🎯 Finalidade
 
-app.use(cors()); app.use(express.json());
+Registra todas as entradas e saídas de produtos (histórico).
 
-// Carregar catálogo (produtos) app.get("/api/produtos", (req, res) => { const produtos = JSON.parse(fs.readFileSync("./data/catalogo.json")); res.json(produtos); });
+📄 Estrutura movimentacao_estoque ( id, produto_id, tipo, quantidade, motivo, referencia, data_movimentacao )
 
-// Receber vendas do PDV app.post("/api/sincronizar/vendas", (req, res) => { const vendas = req.body;
+🔍 Campo por campo Campo Explicação HTML produto_id Produto movimentado Selecionar Produto tipo Entrada ou saída Tipo de Movimentação quantidade Quantidade movimentada Quantidade motivo Compra, venda, perda, etc Motivo referencia Nota fiscal, ajuste, etc Referência data_movimentacao Data/hora da ação Automático
 
-fs.writeFileSync("./data/vendas_recebidas.json", JSON.stringify(vendas, null, 2));
+📌 Nunca se altera a quantidade direto ➡ Sempre via movimentação (boas práticas de estoque).
 
-res.json({ status: "OK", recebidas: vendas.length });
-});
+⚠️ 3️⃣ Tabela alerta_estoque 🎯 Finalidade
 
-app.listen(3000, () => console.log("🚀 API MercadoFácil rodando em http://localhost:3000"));
+Controla avisos automáticos quando o estoque está crítico.
 
-🖥️ 3. Como Executar o PDV (mercadofacil-pdv) 📌 O PDV agora é um cliente Node.js também. Esse cliente funciona offline, lendo e salvando JSON localmente. ▶️ Passos: 1️⃣ Abra a pasta do PDV cd mercadofacil-pdv
+📄 Estrutura alerta_estoque ( id, produto_id, tipo_alerta, descricao, resolvido, data_alerta )
 
-2️⃣ Instale dependências npm install
+🔍 Campo por campo Campo Explicação tipo_alerta ESTOQUE_BAIXO ou FORA_DE_ESTOQUE descricao Mensagem exibida ao usuário resolvido Se o alerta já foi tratado data_alerta Quando o alerta surgiu
 
-3️⃣ Execute o PDV npm start
+📌 Usado na aba Alertas do sistema.
 
-🌐 4. Arquitetura Offline-First (Com JSON Local) O Mercado Fácil implementa uma arquitetura Offline-First, essencial para PDVs que precisam funcionar mesmo sem internet.
+📊 4️⃣ View vw_relatorio_estoque 🎯 Finalidade
 
-🔄 Sincronização de Entrada (Produtos)
+Facilitar o relatório geral sem precisar escrever SQL complexo.
 
-O PDV chama:
+SELECT * FROM vw_relatorio_estoque;
 
-GET /api/produtos
+📌 Ela já traz:
 
-O servidor retorna catalogo.json
+Código
 
-O PDV salva localmente:
+Quantidade
 
-data/catalogo_local.json
+Mínimo
 
-✔️ Assim, consultas de preço e estoque funcionam mesmo offline.
+Máximo
 
-🔄 Sincronização de Saída (Vendas)
+Status
 
-PDV salva vendas localmente em:
+Data de atualização
 
-data/vendas_pendentes.json
+➡ Exatamente o que o HTML mostra no Relatório.
 
-Quando a internet voltar:
+⚙️ 5️⃣ Trigger de Status do Produto 🎯 O que é Trigger?
 
-POST /api/sincronizar/vendas
+É um código que roda automaticamente dentro do MySQL.
 
-Servidor recebe e confirma.
+🔁 Quando ele roda?
 
-PDV apaga o arquivo local de pendências.
+Ao inserir
 
-✔️ Nenhuma venda é perdida se a conexão cair.
+Ao atualizar um produto
 
-🗂️ Estrutura de Pastas Recomendada Servidor Node.js mercadofacil-server/ ├── server.js ├── data/ │ ├── catalogo.json │ └── vendas_recebidas.json ├── package.json └── README.md
+🧠 Lógica Se quantidade = 0 → FORA Se quantidade < mínimo → BAIXO Senão → OK
 
-PDV Node.js mercadofacil-pdv/ ├── app.js ├── data/ │ ├── catalogo_local.json │ └── vendas_pendentes.json ├── package.json └── README.md
+📌 Assim:
 
-✔️ Se quiser, posso gerar TODA a estrutura do projeto para você: 🔧 Opções:
+O sistema não precisa calcular status
 
-Gerar automaticamente os dois package.json
+O banco sempre está consistente
 
-Criar estrutura completa do servidor
+🔄 6️⃣ Trigger de Movimentação 🎯 Função
 
-Criar o PDV completo
+Atualiza o estoque automaticamente quando ocorre uma movimentação.
 
-Criar rotas de sincronização prontas
+🧠 Lógica Entrada → soma quantidade Saída → subtrai quantidade
 
-Criar versão com banco SQLite ao invés de JSON
+📌 Você só grava na tabela movimentacao_estoque ➡ O banco cuida do resto.
 
-👉 O que você deseja que eu gere agora?
+🔐 7️⃣ Relacionamentos (Integridade)
+
+Um produto pode ter várias movimentações
+
+Um produto pode ter vários alertas
+
+ON DELETE CASCADE:
+
+Se apagar um produto, apaga histórico e alertas
+
+📌 Evita dados órfãos.
